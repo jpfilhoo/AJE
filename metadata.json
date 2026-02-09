@@ -1,0 +1,7 @@
+{
+  "name": "AJE Amazonas - Gestão de Associados",
+  "description": "Sistema de gestão e diretório para a Associação de Jovens Empreendedores do Amazonas (AJE), com fluxo de aprovação e painel administrativo.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
