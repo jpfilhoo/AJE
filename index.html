@@ -30,12 +30,14 @@
     "react-dom": "https://esm.sh/react-dom@18.3.1",
     "react-dom/": "https://esm.sh/react-dom@18.3.1/",
     "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.454.0?external=react"
+    "lucide-react": "https://esm.sh/lucide-react@0.454.0?deps=react@18.3.1"
   }
 }
 </script>
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
+    <!-- O script de entrada deve ser carregado como módulo após o importmap -->
+    <script type="module" src="index.tsx"></script>
 </body>
 </html>
