@@ -20,10 +20,17 @@ export interface Member {
   createdAt: string;
 }
 
+export interface News {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface AuthState {
   role: UserRole;
   user: Member | null; // Null if admin or guest
   isAuthenticated: boolean;
 }
 
-export type ViewType = 'DIRECTORY' | 'REGISTER' | 'ADMIN' | 'LOGIN' | 'PROFILE';
+export type ViewType = 'DIRECTORY' | 'REGISTER' | 'ADMIN' | 'LOGIN' | 'PROFILE' | 'NEWS';

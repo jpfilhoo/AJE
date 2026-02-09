@@ -1,16 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewType, Member, AuthState, UserRole } from './types';
+import { ViewType, Member, AuthState, UserRole, News } from './types';
 import MemberDirectory from './components/MemberDirectory';
 import MemberForm from './components/MemberForm';
 import AdminPanel from './components/AdminPanel';
 import Login from './components/Login';
 import AssociateProfile from './components/AssociateProfile';
-import { LayoutDashboard, Users, UserPlus, Building2, LogIn, LogOut, User as UserIcon, Lock } from 'lucide-react';
+import NewsSection from './components/NewsSection';
+import { LayoutDashboard, Users, UserPlus, Building2, LogIn, LogOut, User as UserIcon, Lock, Megaphone } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewType>('DIRECTORY');
+  const [currentView, setCurrentView] = useState<ViewType>('LOGIN');
   const [members, setMembers] = useState<Member[]>([]);
+  const [news, setNews] = useState<News[]>([]);
   const [auth, setAuth] = useState<AuthState>({
     role: 'GUEST',
     user: null,
@@ -20,11 +22,12 @@ const App: React.FC = () => {
   // Initial load
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('aje_amazonas_members');
-      if (saved) {
-        setMembers(JSON.parse(saved));
+      // Members data
+      const savedMembers = localStorage.getItem('aje_amazonas_members');
+      if (savedMembers) {
+        setMembers(JSON.parse(savedMembers));
       } else {
-        const initial: Member[] = [
+        const initialMembers: Member[] = [
           {
             id: '1',
             companyName: 'AJE Amazonas',
@@ -37,33 +40,56 @@ const App: React.FC = () => {
             createdAt: new Date().toISOString()
           }
         ];
-        setMembers(initial);
-        localStorage.setItem('aje_amazonas_members', JSON.stringify(initial));
+        setMembers(initialMembers);
+        localStorage.setItem('aje_amazonas_members', JSON.stringify(initialMembers));
       }
 
+      // News data
+      const savedNews = localStorage.getItem('aje_amazonas_news');
+      if (savedNews) {
+        setNews(JSON.parse(savedNews));
+      } else {
+        const initialNews: News[] = [
+          {
+            id: 'n1',
+            title: 'Seja bem-vindo à nova plataforma AJE!',
+            content: 'Lançamos nosso novo portal para facilitar a conexão entre jovens empreendedores do Amazonas. Explore o diretório e fique atento aos informativos.',
+            createdAt: new Date().toISOString()
+          }
+        ];
+        setNews(initialNews);
+        localStorage.setItem('aje_amazonas_news', JSON.stringify(initialNews));
+      }
+
+      // Auth state
       const savedAuth = localStorage.getItem('aje_session');
       if (savedAuth) {
-        setAuth(JSON.parse(savedAuth));
+        const parsedAuth: AuthState = JSON.parse(savedAuth);
+        setAuth(parsedAuth);
+        if (parsedAuth.isAuthenticated) {
+          setCurrentView(parsedAuth.role === 'ADMIN' ? 'ADMIN' : 'NEWS');
+        }
       }
     } catch (e) {
-      console.error("Error loading data from localStorage", e);
+      console.error("Error loading data", e);
     }
   }, []);
 
   const saveMembers = (newMembers: Member[]) => {
     setMembers(newMembers);
-    try {
-      localStorage.setItem('aje_amazonas_members', JSON.stringify(newMembers));
-    } catch (e) {
-      console.error("Error saving members", e);
-    }
+    localStorage.setItem('aje_amazonas_members', JSON.stringify(newMembers));
+  };
+
+  const saveNews = (newNews: News[]) => {
+    setNews(newNews);
+    localStorage.setItem('aje_amazonas_news', JSON.stringify(newNews));
   };
 
   const handleAddMember = (member: Member) => {
     const updated = [...members, member];
     saveMembers(updated);
-    setCurrentView('DIRECTORY');
-    alert('Cadastro enviado com sucesso! Aguarde a aprovação do administrador.');
+    setCurrentView('LOGIN');
+    alert('Cadastro enviado com sucesso! Aguarde a aprovação administrativa.');
   };
 
   const handleUpdateStatus = (id: string, status: 'ACTIVE' | 'REJECTED' | 'PENDING') => {
@@ -71,72 +97,84 @@ const App: React.FC = () => {
     saveMembers(updated);
   };
 
+  const handleAddNews = (item: News) => {
+    const updated = [item, ...news];
+    saveNews(updated);
+  };
+
+  const handleDeleteNews = (id: string) => {
+    if (confirm('Deseja realmente excluir este informativo?')) {
+      const updated = news.filter(n => n.id !== id);
+      saveNews(updated);
+    }
+  };
+
   const handleLogin = (role: UserRole, user: Member | null) => {
     const newAuth: AuthState = { role, user, isAuthenticated: true };
     setAuth(newAuth);
-    try {
-      localStorage.setItem('aje_session', JSON.stringify(newAuth));
-    } catch (e) {
-      console.error("Error saving session", e);
-    }
-    
-    if (role === 'ADMIN') {
-      setCurrentView('ADMIN');
-    } else {
-      setCurrentView('PROFILE');
-    }
+    localStorage.setItem('aje_session', JSON.stringify(newAuth));
+    setCurrentView(role === 'ADMIN' ? 'ADMIN' : 'NEWS');
   };
 
   const handleLogout = () => {
     const guestAuth: AuthState = { role: 'GUEST', user: null, isAuthenticated: false };
     setAuth(guestAuth);
-    try {
-      localStorage.removeItem('aje_session');
-    } catch (e) {
-      console.error("Error clearing session", e);
-    }
-    setCurrentView('DIRECTORY');
+    localStorage.removeItem('aje_session');
+    setCurrentView('LOGIN');
   };
 
-  // Helper for security checks
-  const isUnauthorized = (view: ViewType) => {
-    if (view === 'ADMIN' && auth.role !== 'ADMIN') return true;
-    if (view === 'PROFILE' && auth.role !== 'ASSOCIATE') return true;
-    return false;
+  // Middleware Logic
+  const canAccess = (view: ViewType) => {
+    if (view === 'LOGIN' || view === 'REGISTER') return true;
+    if (!auth.isAuthenticated) return false;
+    if (view === 'ADMIN' && auth.role !== 'ADMIN') return false;
+    if (view === 'PROFILE' && auth.role !== 'ASSOCIATE') return false;
+    return true;
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => setCurrentView('DIRECTORY')}>
+          <div className="flex items-center gap-2 cursor-pointer shrink-0" onClick={() => setCurrentView(auth.isAuthenticated ? (auth.role === 'ADMIN' ? 'ADMIN' : 'NEWS') : 'LOGIN')}>
             <Building2 className="w-8 h-8 text-[#179939]" />
             <span className="text-xl font-bold text-slate-900 tracking-tight hidden sm:inline">AJE <span className="text-[#179939]">Amazonas</span></span>
           </div>
           
           <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar ml-4">
-            <button 
-              onClick={() => setCurrentView('DIRECTORY')}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentView === 'DIRECTORY' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden lg:inline">Diretório</span>
-            </button>
+            {auth.isAuthenticated && (
+              <>
+                <button 
+                  onClick={() => setCurrentView('NEWS')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${currentView === 'NEWS' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  <Megaphone className="w-4 h-4" />
+                  <span className="hidden lg:inline">Informativos</span>
+                </button>
+                <button 
+                  onClick={() => setCurrentView('DIRECTORY')}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${currentView === 'DIRECTORY' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="hidden lg:inline">Diretório</span>
+                </button>
+              </>
+            )}
             
-            {auth.role === 'GUEST' && (
+            {!auth.isAuthenticated && currentView !== 'REGISTER' && (
               <button 
                 onClick={() => setCurrentView('REGISTER')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentView === 'REGISTER' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 whitespace-nowrap"
               >
                 <UserPlus className="w-4 h-4" />
-                <span className="hidden lg:inline">Associar-se</span>
+                <span>Associar-se</span>
               </button>
             )}
 
             {auth.role === 'ADMIN' && (
               <button 
                 onClick={() => setCurrentView('ADMIN')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentView === 'ADMIN' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${currentView === 'ADMIN' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 <LayoutDashboard className="w-4 h-4" />
                 <span className="hidden lg:inline">Administração</span>
@@ -146,7 +184,7 @@ const App: React.FC = () => {
             {auth.role === 'ASSOCIATE' && (
               <button 
                 onClick={() => setCurrentView('PROFILE')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${currentView === 'PROFILE' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors whitespace-nowrap ${currentView === 'PROFILE' ? 'bg-[#179939]/10 text-[#179939]' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 <UserIcon className="w-4 h-4" />
                 <span className="hidden lg:inline">Meu Perfil</span>
@@ -158,7 +196,7 @@ const App: React.FC = () => {
             {!auth.isAuthenticated ? (
               <button 
                 onClick={() => setCurrentView('LOGIN')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${currentView === 'LOGIN' ? 'bg-[#179939] text-white shadow-md' : 'bg-slate-100 text-[#179939] hover:bg-[#179939]/10'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${currentView === 'LOGIN' ? 'bg-[#179939] text-white' : 'bg-slate-100 text-[#179939]'}`}
               >
                 <LogIn className="w-4 h-4" />
                 <span>Entrar</span>
@@ -177,36 +215,27 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        {isUnauthorized(currentView) ? (
+        {!canAccess(currentView) ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto">
               <Lock className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-slate-800">Acesso Negado</h2>
-              <p className="text-slate-500 mt-2">Você não tem permissão para acessar esta área.</p>
-              <button onClick={() => setCurrentView('LOGIN')} className="mt-6 px-6 py-2 bg-[#179939] text-white rounded-xl font-bold hover:bg-[#179939]/90 transition-all">Fazer Login</button>
+              <h2 className="text-xl font-bold text-slate-800">Acesso Restrito</h2>
+              <p className="text-slate-500 mt-2">Você precisa estar logado para acessar esta área.</p>
+              <button onClick={() => setCurrentView('LOGIN')} className="mt-6 px-6 py-2 bg-[#179939] text-white rounded-xl font-bold hover:bg-[#179939]/90 transition-all shadow-lg shadow-[#179939]/20">Fazer Login Agora</button>
           </div>
         ) : (
           <>
-            {currentView === 'DIRECTORY' && (
-              <MemberDirectory members={members.filter(m => m.status === 'ACTIVE')} />
-            )}
-            {currentView === 'REGISTER' && (
-              <MemberForm onSubmit={handleAddMember} />
-            )}
-            {currentView === 'LOGIN' && (
-              <Login members={members} onLogin={handleLogin} />
-            )}
-            {currentView === 'ADMIN' && auth.role === 'ADMIN' && (
-              <AdminPanel members={members} onUpdateStatus={handleUpdateStatus} />
-            )}
-            {currentView === 'PROFILE' && auth.role === 'ASSOCIATE' && auth.user && (
-              <AssociateProfile member={auth.user} />
-            )}
+            {currentView === 'LOGIN' && <Login members={members} onLogin={handleLogin} />}
+            {currentView === 'REGISTER' && <MemberForm onSubmit={handleAddMember} />}
+            {currentView === 'NEWS' && <NewsSection news={news} />}
+            {currentView === 'DIRECTORY' && <MemberDirectory members={members.filter(m => m.status === 'ACTIVE')} />}
+            {currentView === 'ADMIN' && <AdminPanel members={members} onUpdateStatus={handleUpdateStatus} news={news} onAddNews={handleAddNews} onDeleteNews={handleDeleteNews} />}
+            {currentView === 'PROFILE' && auth.user && <AssociateProfile member={auth.user} />}
           </>
         )}
       </main>
 
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-slate-500 text-sm">
-        <p>&copy; {new Date().getFullYear()} AJE Amazonas - Associação de Jovens Empreendedores. Todos os direitos reservados.</p>
+      <footer className="bg-white border-t border-slate-200 py-6 text-center text-slate-400 text-sm">
+        <p>&copy; {new Date().getFullYear()} AJE Amazonas - Associação de Jovens Empreendedores.</p>
       </footer>
     </div>
   );
